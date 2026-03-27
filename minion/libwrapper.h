@@ -228,6 +228,8 @@ Var constantAsVar(int n);
 /***** Variable *****/
 Var getVarByName(CSPInstance& instance, char* name);
 void newVar_ffi(CSPInstance& instance, char* name, VariableType type, int bound1, int bound2);
+void newVar_midsearch_ffi(CSPInstance& instance, char* name, VariableType type, int bound1,
+                          int bound2);
 
 /***** Tuple *****/
 TupleList* tupleList_new(vector<vector<DomainInt>>& tupleList);

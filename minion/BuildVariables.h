@@ -24,6 +24,9 @@ vector<vector<AnyVarRef>> getAnyVarRefFromVar(const vector<vector<Var>>& v);
 
 /// Create all the variables used in the CSP.
 void buildVariables(const ProbSpec::VarContainer& vars);
+
+/// Create a single variable in the live solver state.
+void buildVariable(const ProbSpec::VarContainer& vars, Var v);
 } // namespace BuildCon
 
 #endif

@@ -146,9 +146,9 @@ struct BigRangeVarContainer {
       varOffset.push_back(varOffset.back() + domainSize);
       varCount_m++;
     }
-    constraints.resize(newDomains.size());
+    constraints.resize(varCount_m);
 #ifdef WDEG
-    wdegs.resize(newDomains.size());
+    wdegs.resize(varCount_m);
 #endif
 
     bound_data = getMemory().backTrack().requestBytesExtendable(varCount_m * BOUND_DATA_SIZE *

@@ -9,6 +9,7 @@
 #include "command_search.h"
 #include "info_dumps.h"
 #include "inputfile_parse/CSPSpec.h"
+#include "midsearch_state.h"
 #include "minion.h"
 #include "parallel/parallel.h"
 #include "solver.h"
@@ -25,6 +26,7 @@ void doStandardSearch(CSPInstance& instance, SearchMethod args);
 void finaliseModel(CSPInstance& instance);
 
 extern Globals* globals;
+bool BUILDING_MIDSEARCH_CONSTRAINT = false;
 
 void resetMinion()
 {
@@ -142,11 +144,17 @@ ReturnCodes runMinion(SearchOptions& options, SearchMethod& args, ProbSpec::CSPI
 /*                    Instance building functions                    */
 /*********************************************************************/
 
-void newVar(CSPInstance& instance, string name, VariableType type, vector<DomainInt> bounds)
+Var addNamedVar(CSPInstance& instance, string name, VariableType type, vector<DomainInt> bounds)
 {
   Var v = instance.vars.getNewVar(type, bounds);
   instance.vars.addSymbol(name, v);
   instance.allVars_list.push_back(makeVec(v));
+  return v;
+}
+
+void newVar(CSPInstance& instance, string name, VariableType type, vector<DomainInt> bounds)
+{
+  addNamedVar(instance, name, type, bounds);
 }
 
 Var constantAsVar(int constant)
@@ -227,6 +235,13 @@ void newVar_ffi(CSPInstance& instance, char* name, VariableType type, int bound1
   newVar(instance, string(name), type, std::vector<DomainInt>({bound1, bound2}));
 }
 
+void newVar_midsearch_ffi(CSPInstance& instance, char* name, VariableType type, int bound1,
+                          int bound2)
+{
+  Var v = addNamedVar(instance, string(name), type, std::vector<DomainInt>({bound1, bound2}));
+  BuildCon::buildVariable(instance.vars, v);
+}
+
 /***** Tuple *****/
 TupleList* tupleList_new(vector<vector<DomainInt>>& tupleList)
 {
@@ -265,6 +280,15 @@ bool instance_addConstraintMidsearch(CSPInstance& instance, ConstraintBlob& cons
   // Keep a stable copy of the blob alive for the lifetime of `instance`.
   // Some built constraints may retain references to blob-owned argument storage.
   instance.constraints.push_back(constraint);
+
+  struct MidsearchBuildGuard {
+    MidsearchBuildGuard() {
+      BUILDING_MIDSEARCH_CONSTRAINT = true;
+    }
+    ~MidsearchBuildGuard() {
+      BUILDING_MIDSEARCH_CONSTRAINT = false;
+    }
+  } guard;
 
   AbstractConstraint* c = build_constraint(instance.constraints.back());
   return getState().addConstraintMidsearch(c);

@@ -81,4 +81,32 @@ void buildVariables(const ProbSpec::VarContainer& vars) {
     INPUT_ERROR("Sparse discrete disabled at present due to bugs. Sorry.");
   }
 }
+
+void buildVariable(const ProbSpec::VarContainer& vars, Var v) {
+  switch(v.type()) {
+  case VAR_BOOL:
+    getVars().boolVarContainer.addVariables(1);
+    break;
+  case VAR_BOUND:
+    getVars().boundVarContainer.addVariables(vars.bound[checked_cast<SysInt>(v.pos())], 1);
+    break;
+  case VAR_SPARSEBOUND:
+    getVars().sparseBoundVarContainer.addVariables(
+        vars.sparseBound[checked_cast<SysInt>(v.pos())], 1);
+    break;
+  case VAR_DISCRETE: {
+    vector<Bounds> newDomains;
+    newDomains.push_back(vars.discrete[checked_cast<SysInt>(v.pos())]);
+    getVars().bigRangeVarContainer.addVariables(newDomains);
+    break;
+  }
+  case VAR_SPARSEDISCRETE:
+    INPUT_ERROR("Sparse discrete disabled at present due to bugs. Sorry.");
+  case VAR_NOTBOOL:
+  case VAR_CONSTANT:
+    INPUT_ERROR("Cannot build non-base variables dynamically");
+  default:
+    INPUT_ERROR("Unknown variable type " << v.type() << ".");
+  }
+}
 } // namespace BuildCon

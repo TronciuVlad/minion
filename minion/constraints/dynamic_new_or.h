@@ -10,6 +10,7 @@
 
 #include "../get_info/get_info.h"
 #include "../memory_management/reversible_vals.h"
+#include "../midsearch_state.h"
 #include "../queue/standard_queue.h"
 #include "../triggering/constraint_abstract.h"
 
@@ -27,7 +28,11 @@ struct Dynamic_OR : public ParentConstraint {
 
   CONSTRAINT_ARG_LIST1(child_constraints);
 
+  // Constraints created during search outlive the search depth where they are built,
+  // so they cannot safely read reversible cells allocated at that depth after backtracking.
   Reversible<bool> fullPropagate_called;
+  bool fullPropagate_called_midsearch;
+  bool use_midsearch_full_propagate_state;
   bool constraintLocked;
 
   SysInt assignSize;
@@ -36,9 +41,23 @@ struct Dynamic_OR : public ParentConstraint {
 
   SysInt watched_constraint[2];
 
-  Dynamic_OR(vector<AbstractConstraint*> _con)
+  bool fullPropagateCalled() const {
+    return use_midsearch_full_propagate_state ? fullPropagate_called_midsearch
+                                              : static_cast<bool>(fullPropagate_called);
+  }
+
+  void setFullPropagateCalled(bool value) {
+    if(use_midsearch_full_propagate_state)
+      fullPropagate_called_midsearch = value;
+    else
+      fullPropagate_called = value;
+  }
+
+  Dynamic_OR(vector<AbstractConstraint*> _con, bool midsearch_constraint = false)
       : ParentConstraint(_con),
         fullPropagate_called(false),
+        fullPropagate_called_midsearch(false),
+        use_midsearch_full_propagate_state(midsearch_constraint),
         constraintLocked(false),
         assignSize(-1),
         propagated_constraint(-1) {
@@ -46,6 +65,8 @@ struct Dynamic_OR : public ParentConstraint {
     for(SysInt i = 0; i < (SysInt)child_constraints.size(); ++i)
       maxSize = max(maxSize, child_constraints[i]->getVarsSingleton()->size());
     assignSize = maxSize * 2;
+    watched_constraint[0] = -1;
+    watched_constraint[1] = -1;
   }
 
   virtual BOOL checkAssignment(DomainInt* v, SysInt vSize) {
@@ -97,7 +118,7 @@ struct Dynamic_OR : public ParentConstraint {
     constraintLocked = false;
     P("Full propagating: " << propagated_constraint);
     child_constraints[propagated_constraint]->fullPropagate();
-    fullPropagate_called = true;
+    setFullPropagateCalled(true);
   }
 
   virtual void specialUnlock() {
@@ -109,13 +130,13 @@ struct Dynamic_OR : public ParentConstraint {
     // PROP_INFO_ADDONE(WatchedOr);
     P("Prop");
     P("Current: " << watched_constraint[0] << " . " << watched_constraint[1]);
-    P("FullPropOn: " << (bool)fullPropagate_called << ", on: " << propagated_constraint);
+    P("FullPropOn: " << fullPropagateCalled() << ", on: " << propagated_constraint);
     P("Locked:" << constraintLocked);
     if(constraintLocked)
       return;
 
     if(trig >= 0 && trig < assignSize * 2) {
-      if(fullPropagate_called)
+      if(fullPropagateCalled())
         return;
 
       SysInt tripped_constraint = checked_cast<SysInt>(trig / assignSize);
@@ -172,7 +193,7 @@ struct Dynamic_OR : public ParentConstraint {
       return;
     }
 
-    if(fullPropagate_called && getChildDynamicTrigger(trig) == propagated_constraint) {
+    if(fullPropagateCalled() && getChildDynamicTrigger(trig) == propagated_constraint) {
       P("Propagating child");
       passDynTriggerToChild(trig, dd);
       // child_constraints[propagated_constraint]->propagateDynInt(trig);
@@ -198,6 +219,12 @@ struct Dynamic_OR : public ParentConstraint {
 
   virtual void fullPropagate() {
     P("Full Propagate")
+    setFullPropagateCalled(false);
+    constraintLocked = false;
+    propagated_constraint = -1;
+    watched_constraint[0] = -1;
+    watched_constraint[1] = -1;
+
     // Clean up triggers
     for(SysInt i = 0; i < assignSize * 2; ++i)
       releaseTriggerInt(i);
@@ -269,7 +296,7 @@ inline AbstractConstraint* BuildCT_WATCHED_NEW_OR(ConstraintBlob& bl) {
   vector<AbstractConstraint*> cons;
   for(SysInt i = 0; i < (SysInt)bl.internal_constraints.size(); ++i)
     cons.push_back(build_constraint(bl.internal_constraints[i]));
-  return new Dynamic_OR(cons);
+  return new Dynamic_OR(cons, BUILDING_MIDSEARCH_CONSTRAINT);
 }
 
 /* JSON

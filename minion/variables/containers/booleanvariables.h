@@ -43,8 +43,6 @@ struct BoolVarRef_internal {
 
   data_type shiftOffset;
   SysInt varNum;
-  void* data_position;
-  void* value_position;
 
   UnsignedSysInt dataOffset() const {
     return varNum / (sizeof(data_type) * 8);
@@ -52,29 +50,20 @@ struct BoolVarRef_internal {
 
   static BoolVarContainer& getCon_Static();
   BoolVarRef_internal(const BoolVarRef_internal& b)
-      : shiftOffset(b.shiftOffset),
-        varNum(b.varNum),
-        data_position(b.data_position),
-        value_position(b.value_position) {}
+      : shiftOffset(b.shiftOffset), varNum(b.varNum) {}
 
   void operator=(const BoolVarRef_internal& b) {
     shiftOffset = b.shiftOffset;
     varNum = b.varNum;
-    data_position = b.data_position;
-    value_position = b.value_position;
   }
 
   BoolVarRef_internal() : shiftOffset(~1), varNum(~1) {}
 
   BoolVarRef_internal(DomainInt value, BoolVarContainer* b_con);
 
-  data_type& assign_ptr() const {
-    return *static_cast<data_type*>(data_position);
-  }
+  data_type& assign_ptr() const;
 
-  data_type& valuePtr() const {
-    return *static_cast<data_type*>(value_position);
-  }
+  data_type& valuePtr() const;
 
   BOOL isAssigned() const {
     return assign_ptr() & shiftOffset;
@@ -321,10 +310,16 @@ inline BoolVarRef BoolVarContainer::getVarNum(DomainInt i) {
 }
 
 inline BoolVarRef_internal::BoolVarRef_internal(DomainInt value, BoolVarContainer* b_con)
-    : varNum(checked_cast<UnsignedSysInt>(value)),
-      data_position((char*)(b_con->assignOffset()) + dataOffset() * sizeof(data_type)),
-      value_position((char*)(b_con->values_mem) + dataOffset() * sizeof(data_type)) {
+    : varNum(checked_cast<UnsignedSysInt>(value)) {
   shiftOffset = one << (checked_cast<UnsignedSysInt>(value) % (sizeof(data_type) * 8));
+}
+
+inline data_type& BoolVarRef_internal::assign_ptr() const {
+  return getCon_Static().assign_ptr()[dataOffset()];
+}
+
+inline data_type& BoolVarRef_internal::valuePtr() const {
+  return getCon_Static().valuePtr()[dataOffset()];
 }
 
 #endif

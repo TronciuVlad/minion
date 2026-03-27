@@ -25,22 +25,17 @@ struct BoundVarRef_internal {
     FATAL_REPORTABLE_ERROR();
   }
 
-  void* varBound_data;
   DomainInt varNum;
 
-  const DomType& lowerBound() const {
-    return *static_cast<DomType*>(varBound_data);
-  }
+  const DomType& lowerBound() const;
 
-  const DomType& upperBound() const {
-    return *(static_cast<DomType*>(varBound_data) + 1);
-  }
+  const DomType& upperBound() const;
 
   static BoundVarContainer<DomType>& getCon_Static();
   BoundVarRef_internal() : varNum(-1) {}
 
   explicit BoundVarRef_internal(BoundVarContainer<DomType>*, DomainInt i, DomType* ptr)
-      : varBound_data(ptr), varNum(i) {}
+      : varNum(i) {}
 
   BOOL isAssigned() const {
     return lowerBound() == upperBound();
@@ -432,4 +427,14 @@ inline BoundVarRef BoundVarContainer<T>::getVarNum(DomainInt i) {
   // lowerBound(i)...
   return BoundVarRef(
       BoundVarRef_internal<>(this, i, (DomainInt*)(bound_data()) + checked_cast<SysInt>(i) * 2));
+}
+
+template <typename DomType>
+inline const DomType& BoundVarRef_internal<DomType>::lowerBound() const {
+  return getCon_Static().lowerBound(*this);
+}
+
+template <typename DomType>
+inline const DomType& BoundVarRef_internal<DomType>::upperBound() const {
+  return getCon_Static().upperBound(*this);
 }
